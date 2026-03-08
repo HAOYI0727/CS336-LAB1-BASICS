@@ -1,0 +1,30 @@
+import torch
+from torch import nn
+
+class RMSNorm(nn.Module):
+    def __init__(self, d_model: int, eps: float = 1e-5, device=None, dtype=None):
+        '''
+        均方根归一化（RMSNorm）——将输入除以输入的平方根的平均值来稳定训练。
+        参数：
+            d_model（int): 经过embedding层之后，每个token的维度
+            eps（float）: 一个很小的常数，用于避免除以零
+            device (torch.device): 设备
+            dtype (torch.dtype): 数据类型
+        '''
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(d_model, device=device, dtype=dtype)) # weight对应缩放参数 gamma
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        '''
+        公式: x_norm = x / (x.pow(2).mean(dim=-1, keepdim=True) + eps).sqrt()
+             x_norm = x_norm * weight
+        '''
+        # 对于不同的精度要先转换为float32再进行归一化，最后再转换回原来的精度
+        input_dtype = x.dtype
+        x = x.to(torch.float32)
+
+        variance = x.pow(2).mean(-1, keepdim=True)
+        x = x * torch.rsqrt(variance + self.eps)
+
+        return (self.weight * x).to(input_dtype)
